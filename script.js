@@ -194,3 +194,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const mobileOverlay = document.getElementById('mobileNavOverlay');
+    const closeBtn = document.getElementById('mobileNavCloseBtn');
+    if (closeBtn && mobileOverlay) {
+        closeBtn.addEventListener('click', () => {
+            mobileOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+    }
+});
