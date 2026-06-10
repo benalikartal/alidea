@@ -109,15 +109,13 @@ async function initDB() {
 // ─── SEED: İlk çalıştırmada kullanıcıları oluştur ────────────────────────────
 
 async function seedUsers() {
-  const existing = await db.get('SELECT COUNT(*) as c FROM users');
-  if (parseInt(existing.c) > 0) return; // Zaten kullanıcı var, atla
-
-  console.log('🌱 İlk çalıştırma — kullanıcılar oluşturuluyor...');
+  console.log('🌱 Çevre değişkenlerinden kullanıcılar senkronize ediliyor...');
 
   // Admin
   const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin', 12);
   await db.query(`
     INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'admin')
+    ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
   `, [process.env.ADMIN_USERNAME || 'admin', adminHash]);
 
   // Müşteri hesapları: CUSTOMER_ACCOUNTS=kullanici:sifre:musteri_id,...
@@ -129,7 +127,7 @@ async function seedUsers() {
     await db.query(`
       INSERT INTO users (username, password_hash, role, customer_id)
       VALUES ($1, $2, 'customer', $3)
-      ON CONFLICT (username) DO NOTHING
+      ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
     `, [username, hash, customerId || null]);
   }
 
