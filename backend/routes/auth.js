@@ -46,7 +46,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     // JWT token oluştur (1 gün geçerli)
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, customerId: user.customer_id },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'alidea_super_secret_jwt_key_2024_xK9mP2qR7vN3wL8',
       { expiresIn: '1d' }
     );
 
@@ -98,7 +98,7 @@ router.post('/verify-pin', requireAuth, (req, res) => {
   const { pin } = req.body || {};
   if (!pin) return res.status(400).json({ error: 'PIN gerekli.' });
 
-  const correct = pin === process.env.PANEL_PIN;
+  const correct = pin === (process.env.PANEL_PIN || 'alidea');
   if (!correct) return res.status(401).json({ error: 'Hatalı şifre.' });
 
   return res.json({ success: true });

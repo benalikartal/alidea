@@ -20,7 +20,7 @@ function requireAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'alidea_super_secret_jwt_key_2024_xK9mP2qR7vN3wL8');
     req.user = payload;
     next();
   } catch (err) {
