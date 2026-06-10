@@ -422,33 +422,103 @@ section {
 }
 
 /* Footer */
-footer {
+.basic-footer {
     border-top: 1px solid var(--border-color);
-    padding: 4rem 2rem;
-    background: #fff;
+    padding: 60px 5%;
+    background-color: var(--bg-color);
 }
 
-.footer-content {
+/* Dark Basic Footer */
+.basic-footer.dark-footer {
+    background-color: #050505;
+    border-top: 1px solid #222;
+}
+
+.basic-footer.dark-footer .footer-left h2,
+.basic-footer.dark-footer .footer-email,
+.basic-footer.dark-footer .footer-socials a:hover {
+    color: #ffffff;
+}
+
+.basic-footer.dark-footer .footer-left p,
+.basic-footer.dark-footer .footer-socials a,
+.basic-footer.dark-footer .footer-socials span {
+    color: #888888;
+}
+
+.basic-footer .footer-content {
     max-width: 1200px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 30px;
 }
 
-.footer-links {
+.basic-footer .footer-left h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 5px 0;
+}
+
+.basic-footer .footer-left p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.basic-footer .footer-right {
+    text-align: right;
     display: flex;
-    gap: 2rem;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.footer-links a {
+.basic-footer .footer-email {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.basic-footer .footer-socials {
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.basic-footer .footer-socials a {
     color: var(--text-secondary);
     text-decoration: none;
-    font-size: 0.875rem;
+    transition: color 0.3s;
 }
 
-.footer-links a:hover {
+.basic-footer .footer-socials a:hover {
     color: var(--text-primary);
+}
+
+.basic-footer .footer-copy {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+}
+
+@media (max-width: 768px) {
+    .basic-footer .footer-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .basic-footer .footer-right {
+        text-align: left;
+        align-items: flex-start;
+    }
+    .basic-footer .footer-socials {
+        justify-content: flex-start;
+    }
 }
 
 /* Animations */
