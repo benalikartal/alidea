@@ -1291,7 +1291,7 @@
       border-color: rgba(255,255,255,0.12);
     }
 
-    .ov-day.other-m { opacity: 0.25; pointer-events: none; }
+    .ov-day.other-m, .ov-day.next-m {\n      opacity: 0.8;\n    }\n    .ov-day.other-m { opacity: 0.25; pointer-events: none; }
 
     .ov-day.today {
       border-color: var(--primary);
@@ -3072,6 +3072,7 @@
 
   // ── SHOOT CALENDAR ────────────────────────────────────────
   function renderShootCal(ci) {
+    if (!shootDays[ci]) shootDays[ci] = new Set();
     const c = customers[ci];
     const sDate = c.startDate ? new Date(c.startDate) : new Date();
     const year  = sDate.getFullYear();
@@ -3171,6 +3172,8 @@
   };
 
   function renderPosts(ci) {
+    if (!cPosts[ci]) cPosts[ci] = [];
+    if (!shootDone[ci]) shootDone[ci] = new Set();
     const c = customers[ci];
     const sDate = c.startDate ? new Date(c.startDate) : new Date();
     const year  = sDate.getFullYear();
@@ -3347,6 +3350,7 @@
   };
 
   function renderIdeas(ci) {
+    if (!cIdeas[ci]) cIdeas[ci] = [];
     const list = cIdeas[ci];
     const body = document.getElementById(`ideas-body-${ci}`);
     if (!body) return;
@@ -3431,7 +3435,12 @@
     const MONTH_TR    = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
                          'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
-    if (monthLbl) monthLbl.textContent = `${MONTH_TR[month]} ${year}`;
+    if (monthLbl) {
+      let nextMonth = month + 1;
+      let nextYear = year;
+      if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+      monthLbl.textContent = `${MONTH_TR[month]} ${year} - ${MONTH_TR[nextMonth]} ${nextYear}`;
+    }
 
     // Build shootMap[dateStr] = [ci...]   postMap[dateStr] = [{ci, platform, content}...]
     const shootMap = {};
@@ -3495,24 +3504,38 @@
       legendEl.innerHTML = legHtml;
     }
 
-    // Calendar grid
+    // 2 Months seamless days
+    const totalDays2 = new Date(year, month + 2, 0).getDate();
+    const totalDaysToShow = totalDays + totalDays2;
     let html = dayLabels.map(d => `<div class="ov-day-name">${d}</div>`).join('');
 
-    // Prev month fillers
-    for (let i = startOffset - 1; i >= 0; i--)
+    for (let i = startOffset - 1; i >= 0; i--) {
       html += `<div class="ov-day other-m"><div class="ov-day-num">${prevTotal - i}</div></div>`;
+    }
 
-    // Current month days
-    for (let d = 1; d <= totalDays; d++) {
-      const isToday  = d === now.getDate();
-      const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    for (let i = 0; i < totalDaysToShow; i++) {
+      const curDate = new Date(year, month, 1 + i);
+      const curY = curDate.getFullYear();
+      const curM = curDate.getMonth();
+      const curD = curDate.getDate();
+      
+      const isToday  = (curY === now.getFullYear() && curM === now.getMonth() && curD === now.getDate());
+      const dateStr  = `${curY}-${String(curM+1).padStart(2,'0')}-${String(curD).padStart(2,'0')}`;
       const shoots   = shootMap[dateStr] || [];
       const posts    = postMap[dateStr]  || [];
       const hasAct   = shoots.length > 0 || posts.length > 0;
 
-      let inner = `<div class="ov-day-num">${d}</div>`;
+      let extraClass = (curM !== month) ? 'next-m' : '';
+      if (isToday) extraClass += ' today';
+      if (hasAct)  extraClass += ' has-activity';
 
-      // Shoot badges (max 3 shown)
+      let inner = '';
+      if (curD === 1 && curM !== month) {
+          inner += `<div class="ov-day-num" style="background:var(--primary); color:#fff; border-radius:4px; padding:2px 6px; display:inline-block; font-size:10px;">1 ${MONTH_TR[curM]}</div>`;
+      } else {
+          inner += `<div class="ov-day-num">${curD}</div>`;
+      }
+
       shoots.slice(0, 3).forEach(ci => {
         const col = C_COLORS[ci % C_COLORS.length];
         const c   = customers[ci];
@@ -3522,7 +3545,6 @@
       });
       if (shoots.length > 3) inner += `<div class="ov-badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted)">+${shoots.length-3} çekim</div>`;
 
-      // Post badges (max 2 shown)
       posts.slice(0, 2).forEach(p => {
         const pc  = postColors[p.type] || postColors['Diğer'];
         const c   = customers[p.ci];
@@ -3532,14 +3554,15 @@
       });
       if (posts.length > 2) inner += `<div class="ov-badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted)">+${posts.length-2} paylaşım</div>`;
 
-      html += `<div class="ov-day ${isToday?'today':''} ${hasAct?'has-activity':''}">${inner}</div>`;
+      html += `<div class="ov-day ${extraClass}">${inner}</div>`;
     }
 
-    // Next month fillers
-    const used = startOffset + totalDays;
-    const rem  = (7 - (used % 7)) % 7;
-    for (let d = 1; d <= rem; d++)
-      html += `<div class="ov-day other-m"><div class="ov-day-num">${d}</div></div>`;
+    const usedCells = startOffset + totalDaysToShow;
+    const rem = (7 - (usedCells % 7)) % 7;
+    for (let i = 0; i < rem; i++) {
+      const curDate = new Date(year, month, 1 + totalDaysToShow + i);
+      html += `<div class="ov-day other-m"><div class="ov-day-num">${curDate.getDate()}</div></div>`;
+    }
 
     calEl.innerHTML = html;
 
@@ -3903,21 +3926,51 @@
       if (this.dbType === 'local') {
         localStorage.setItem('rs_customers', JSON.stringify(customers));
         localStorage.setItem('rs_payments', JSON.stringify(payments));
+        localStorage.setItem('rs_shootDays', JSON.stringify(shootDays.map(s => Array.from(s))));
+        localStorage.setItem('rs_shootDone', JSON.stringify(shootDone.map(s => Array.from(s))));
+        localStorage.setItem('rs_cPosts', JSON.stringify(cPosts));
+        localStorage.setItem('rs_cIdeas', JSON.stringify(cIdeas));
       } else {
         this.db.ref('rs_data').set({
           customers: customers,
-          payments: payments
+          payments: payments,
+          shootDays: shootDays.map(s => Array.from(s)),
+          shootDone: shootDone.map(s => Array.from(s)),
+          cPosts: cPosts,
+          cIdeas: cIdeas
         });
       }
     },
 
     loadData: function(callback) {
       if (this.dbType === 'local') {
-        const c = localStorage.getItem('rs_customers');
-        const p = localStorage.getItem('rs_payments');
-        if (c) { customers.length = 0; customers.push(...JSON.parse(c)); }
-        if (p) { payments.length = 0; payments.push(...JSON.parse(p)); }
+        try {
+          const c = localStorage.getItem('rs_customers');
+          const p = localStorage.getItem('rs_payments');
+          const sd = localStorage.getItem('rs_shootDays');
+          const sdo = localStorage.getItem('rs_shootDone');
+          const cp = localStorage.getItem('rs_cPosts');
+          const ci = localStorage.getItem('rs_cIdeas');
+          if (c) { customers.length = 0; customers.push(...JSON.parse(c)); }
+          if (p) { payments.length = 0; payments.push(...JSON.parse(p)); }
+          if (sd) { shootDays.length = 0; shootDays.push(...JSON.parse(sd).map(arr => arr ? new Set(arr) : new Set())); }
+          if (sdo) { shootDone.length = 0; shootDone.push(...JSON.parse(sdo).map(arr => arr ? new Set(arr) : new Set())); }
+          if (cp) { cPosts.length = 0; cPosts.push(...JSON.parse(cp).map(arr => arr || [])); }
+          if (ci) { cIdeas.length = 0; cIdeas.push(...JSON.parse(ci).map(arr => arr || [])); }
+        } catch(e) { console.error(e); }
         
+        while(shootDays.length < customers.length) shootDays.push(new Set());
+        while(shootDone.length < customers.length) shootDone.push(new Set());
+        while(cPosts.length < customers.length) cPosts.push([]);
+        while(cIdeas.length < customers.length) cIdeas.push([]);
+        
+        for(let i=0; i<customers.length; i++) {
+          if (!shootDays[i]) shootDays[i] = new Set();
+          if (!shootDone[i]) shootDone[i] = new Set();
+          if (!cPosts[i]) cPosts[i] = [];
+          if (!cIdeas[i]) cIdeas[i] = [];
+        }
+
         this.lastHash = JSON.stringify(customers) + JSON.stringify(payments);
         this.startAutoSave();
         if(callback) callback();
@@ -3927,7 +3980,23 @@
           if (data) {
             if (data.customers) { customers.length = 0; customers.push(...data.customers); }
             if (data.payments) { payments.length = 0; payments.push(...data.payments); }
+            if (data.shootDays) { shootDays.length = 0; shootDays.push(...Array.from(data.shootDays || []).map(arr => arr ? new Set(arr) : new Set())); }
+            if (data.shootDone) { shootDone.length = 0; shootDone.push(...Array.from(data.shootDone || []).map(arr => arr ? new Set(arr) : new Set())); }
+            if (data.cPosts) { cPosts.length = 0; cPosts.push(...Array.from(data.cPosts || []).map(arr => arr || [])); }
+            if (data.cIdeas) { cIdeas.length = 0; cIdeas.push(...Array.from(data.cIdeas || []).map(arr => arr || [])); }
           }
+          while(shootDays.length < customers.length) shootDays.push(new Set());
+          while(shootDone.length < customers.length) shootDone.push(new Set());
+          while(cPosts.length < customers.length) cPosts.push([]);
+          while(cIdeas.length < customers.length) cIdeas.push([]);
+          
+          for(let i=0; i<customers.length; i++) {
+            if (!shootDays[i]) shootDays[i] = new Set();
+            if (!shootDone[i]) shootDone[i] = new Set();
+            if (!cPosts[i]) cPosts[i] = [];
+            if (!cIdeas[i]) cIdeas[i] = [];
+          }
+
           this.lastHash = JSON.stringify(customers) + JSON.stringify(payments);
           this.startAutoSave();
           if(callback) callback();
@@ -5257,7 +5326,7 @@
     wrapper.style.fontFamily = 'Arial, sans-serif';
     wrapper.style.color = '#2c3e50';
     wrapper.style.background = '#ffffff';
-    wrapper.style.width = '800px';
+    wrapper.style.width = '700px';
     wrapper.style.boxSizing = 'border-box';
 
     wrapper.innerHTML = `
@@ -5329,9 +5398,16 @@
       jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '-9999px';
+    document.body.appendChild(wrapper);
+
     html2pdf().set(opt).from(wrapper).save().then(() => {
+      document.body.removeChild(wrapper);
       showToast('✅ PDF başarıyla indirildi!');
     }).catch(err => {
+      if(wrapper.parentNode) document.body.removeChild(wrapper);
       console.error(err);
       showToast('❌ PDF oluşturulurken bir hata oluştu.');
     });
@@ -5391,8 +5467,14 @@
   StorageManager.loadData(() => {
     updateSidebarList();
     renderGlobalOverview();
-    const defaultNav = document.querySelector('.nav-link[data-page="customers"]');
-    navigate(defaultNav, 'customers', 'reklam', true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('panel') === 'saas') {
+      const saasNav = document.querySelector('.nav-link[data-page="global-overview"]');
+      navigate(saasNav, 'global-overview', null, true);
+    } else {
+      const defaultNav = document.querySelector('.nav-link[data-page="customers"]');
+      navigate(defaultNav, 'customers', 'reklam', true);
+    }
   });
 </script>
 

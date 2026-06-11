@@ -61,12 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const openModal = () => {
             modal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // prevent background scrolling
+            // document.body.style.overflow = 'hidden'; // Removed for mobile touch scroll compatibility
         };
 
         const closeModal = () => {
             modal.classList.add('hidden');
-            document.body.style.overflow = '';
+            // document.body.style.overflow = '';
             // Reset form
             setTimeout(() => {
                 leadForm.reset();
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // open modal
             mainModal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
+            // document.body.style.overflow = 'hidden';
         });
     }
 });
