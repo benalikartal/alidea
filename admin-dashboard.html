@@ -5398,16 +5398,9 @@
       jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '-9999px';
-    document.body.appendChild(wrapper);
-
     html2pdf().set(opt).from(wrapper).save().then(() => {
-      document.body.removeChild(wrapper);
       showToast('✅ PDF başarıyla indirildi!');
     }).catch(err => {
-      if(wrapper.parentNode) document.body.removeChild(wrapper);
       console.error(err);
       showToast('❌ PDF oluşturulurken bir hata oluştu.');
     });
