@@ -10,11 +10,26 @@ const { requireAuth } = require('../middleware/requireAuth');
 
 const router = express.Router();
 
+// ─── JWT Secret doğrulaması — eksikse sunucu başlamaz ───────────────────────
+if (!process.env.JWT_SECRET) {
+  console.error('HATA: JWT_SECRET ortam değişkeni tanımlı değil. Sunucu durduruluyor.');
+  process.exit(1);
+}
+
 // ─── Rate limiter: 15 dakikada max 10 login denemesi ─────────────────────────
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: 'Çok fazla başarısız giriş denemesi. 15 dakika bekleyin.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ─── Rate limiter: verify-pin — 15 dakikada max 5 deneme ─────────────────────
+const pinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Çok fazla yanlış PIN denemesi. 15 dakika bekleyin.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -46,16 +61,18 @@ router.post('/login', loginLimiter, async (req, res) => {
     // JWT token oluştur (1 gün geçerli)
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, customerId: user.customer_id },
-      process.env.JWT_SECRET || 'alidea_super_secret_jwt_key_2024_xK9mP2qR7vN3wL8',
+      process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
 
     // HTTP-only cookie olarak gönder (JS okuyamaz)
+    // secure: true — HTTPS bağlantılarında otomatik aktif (production güvenliği)
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('token', token, {
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 1 gün
-      // secure: true — Deploy'da HTTPS zorunlu olduğunda açın
+      secure: isSecure,
     });
 
     // Yönlendirme URL'ini role göre belirle
@@ -94,11 +111,17 @@ router.get('/me', requireAuth, (req, res) => {
 
 // ─── POST /api/auth/verify-pin ───────────────────────────────────────────────
 // Admin panelindeki modal şifre doğrulaması (overview/ödemeler için)
-router.post('/verify-pin', requireAuth, (req, res) => {
+// pinLimiter: 15 dakikada max 5 yanlış deneme — brute-force koruması
+router.post('/verify-pin', requireAuth, pinLimiter, (req, res) => {
   const { pin } = req.body || {};
   if (!pin) return res.status(400).json({ error: 'PIN gerekli.' });
 
-  const correct = pin === (process.env.PANEL_PIN || 'alidea');
+  if (!process.env.PANEL_PIN) {
+    console.error('HATA: PANEL_PIN ortam değişkeni tanımlı değil.');
+    return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
+  }
+
+  const correct = pin === process.env.PANEL_PIN;
   if (!correct) return res.status(401).json({ error: 'Hatalı şifre.' });
 
   return res.json({ success: true });

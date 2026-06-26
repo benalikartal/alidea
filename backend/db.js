@@ -111,12 +111,17 @@ async function initDB() {
 async function seedUsers() {
   console.log('🌱 Çevre değişkenlerinden kullanıcılar senkronize ediliyor...');
 
-  // Admin
-  const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin', 12);
+  // Ortam değişkenleri zorunlu — eksikse seed çalışmaz
+  if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_USERNAME) {
+    console.error('HATA: ADMIN_USERNAME veya ADMIN_PASSWORD tanımlı değil. Sunucu durduruluyor.');
+    process.exit(1);
+  }
+
+  const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 12);
   await db.query(`
     INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'admin')
     ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
-  `, [process.env.ADMIN_USERNAME || 'admin', adminHash]);
+  `, [process.env.ADMIN_USERNAME, adminHash]);
 
   // Müşteri hesapları: CUSTOMER_ACCOUNTS=kullanici:sifre:musteri_id,...
   const accounts = (process.env.CUSTOMER_ACCOUNTS || '').split(',').filter(Boolean);

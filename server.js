@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const cors         = require('cors');
 const path         = require('path');
 const fs           = require('fs');
+const crypto       = require('crypto');
 const jwt          = require('jsonwebtoken');
 const { buildSitemap, buildRobotsTxt, toCanonical, buildHeadTags } = require('./seo-utils');
 const { serveOptimizedImage, buildPreloadTag } = require('./image-optimizer');
@@ -19,9 +20,30 @@ const PORT = process.env.PORT || 3005;
 
 // ─── GÜVENLİK MIDDLEWARE'LERİ ─────────────────────────────────────────────────
 
-app.use(helmet({
-  contentSecurityPolicy: false, // HTML'ler inline script kullanıyor, geçici olarak kapalı
-}));
+// Her istek için benzersiz bir nonce üret — CSP inline script güvenliği
+app.use((req, res, next) => {
+  res.locals.nonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
+// Helmet: CSP nonce ile aktif (inline script'lere sadece doğru nonce ile izin verilir)
+app.use((req, res, next) => {
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc:     ["'self'"],
+        scriptSrc:      ["'self'", `'nonce-${res.locals.nonce}'`, 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        styleSrc:       ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        fontSrc:        ["'self'", 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
+        imgSrc:         ["'self'", 'data:', 'https:'],
+        connectSrc:     ["'self'"],
+        frameSrc:       ["'none'"],
+        objectSrc:      ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  })(req, res, next);
+});
 
 app.use(cors({ origin: false })); // Aynı origin dışından erişim yok
 app.use(cookieParser());
@@ -34,6 +56,7 @@ app.use(express.urlencoded({ extended: true }));
 const ADMIN_ONLY_PAGES = [
   '/admin-dashboard.html',
   '/messages-dashboard.html',
+  '/admin.html', // Eski yönlendirme sayfası da korunuyor
 ];
 
 const AUTH_REQUIRED_PAGES = [
@@ -203,10 +226,13 @@ app.get('/{*path}', (req, res) => {
   let urlPath = req.path;
   if (urlPath === '/') urlPath = '/index.html';
 
-  const filePath = path.join(ROOT, urlPath);
+  // path.resolve ile path traversal koruması (path.join'den daha güvenli)
+  const filePath = path.resolve(ROOT, '.' + urlPath);
 
-  // Path traversal koruması
-  if (!filePath.startsWith(ROOT)) return res.status(403).end('Forbidden');
+  // Kök dizinin dışına çıkış girişimlerini engelle
+  if (!filePath.startsWith(path.resolve(ROOT) + path.sep) && filePath !== path.resolve(ROOT)) {
+    return res.status(403).end('Forbidden');
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
@@ -253,15 +279,21 @@ app.get('/{*path}', (req, res) => {
         output = output.replace(/<meta\s+name=["']twitter:[^"']+["'][^>]*>/gi, '');
 
         // 6. SEO bloku + LCP preload tag'lerini </head>'den hemen önce inject et
+        const nonce = res.locals.nonce || '';
         const headInjection = [
           metaBlock,
           preloadBlock,
         ].filter(Boolean).join('\n');
         output = output.replace('</head>', `${headInjection}\n</head>`);
 
-        // 7. optimized-media.js'i </body>'den önce inject et (zaten yoksa)
+        // 7. optimized-media.js'i </body>'den önce inject et (nonce ile, zaten yoksa)
         if (!output.includes('optimized-media.js')) {
-          output = output.replace('</body>', `  <script src="/optimized-media.js" defer></script>\n</body>`);
+          output = output.replace('</body>', `  <script src="/optimized-media.js" defer nonce="${nonce}"></script>\n</body>`);
+        }
+
+        // 8. Mevcut inline <script> ve <style> taglarına nonce ekle (CSP uyumu)
+        if (nonce) {
+          output = output.replace(/<script(?![^>]*nonce=)([^>]*)>/g, `<script nonce="${nonce}"$1>`);
         }
 
         res.writeHead(200, { 'Content-Type': mime });
